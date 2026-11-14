@@ -998,6 +998,26 @@
     const finishButton = $('finishTournament');
     if (finishButton) finishButton.disabled = !isOwnerAdmin();
   }
+  function renderAdminBenchAssign(team, editable) {
+    const panel = $('admiralBenchAssign');
+    if (!panel || !team) return;
+    const free = Math.max(0, 4 - team.members.length);
+    if (!free) {
+      panel.innerHTML = '<div class="bench-assign-note"><strong>Все четыре слота заняты.</strong><span>Новый участник появится только после очистки существующего слота.</span></div>';
+      return;
+    }
+    const candidates = state.reserveCandidates.filter((candidate) => ['reserve', 'proposed', 'approved'].includes(candidate.status));
+    if (!editable) {
+      panel.innerHTML = `<div class="bench-assign-note"><strong>Свободных слотов: ${free}.</strong><span>Заполнить их кандидатами может только адмирал с правом редактирования.</span></div>`;
+      return;
+    }
+    if (!candidates.length) {
+      panel.innerHTML = `<div class="bench-assign-note"><strong>Свободных слотов: ${free}.</strong><span>На скамейке пока нет кандидатов для этой команды.</span></div>`;
+      return;
+    }
+    const hasCaptain = team.members.some((member) => member.role === 'captain');
+    panel.innerHTML = `<div class="field-label">ЗАПОЛНИТЬ СВОБОДНЫЙ СЛОТ ИЗ СКАМЕЙКИ</div><p class="bench-assign-help">Команда «${escapeHtml(team.name)}» · свободных слотов: ${free}. Адмирал выбирает кандидата, роль и выдаёт новый пропуск.</p><form id="adminAssignBenchForm" class="bench-assign-form"><label class="sr-only" for="adminBenchCandidate">Кандидат со скамейки</label><select id="adminBenchCandidate" required><option value="">Выбрать кандидата</option>${candidates.map((candidate) => `<option value="${escapeHtml(candidate.id)}">${escapeHtml(candidate.name)} · ${candidate.desiredRole === 'captain' ? 'хочет быть капитаном' : 'хочет быть матросом'}</option>`).join('')}</select><label class="sr-only" for="adminBenchRole">Роль в свободном слоте</label><select id="adminBenchRole" required><option value="member">Матросский слот</option><option value="captain" ${hasCaptain ? 'disabled' : ''}>Капитанский слот</option></select><button type="submit" class="button button-outline">Зачислить и выдать пропуск</button></form>`;
+  }
   function renderAdminRoster() {
     const select = $('admiralTeamSelect');
     const list = $('admiralRoster');
@@ -1011,6 +1031,27 @@
     const filled = team.members.map((member, index) => `<div class="admin-roster-entry"><span class="crew-avatar" aria-hidden="true">${escapeHtml(member.name[0] || '✦')}</span><div><strong>СЛОТ ${index + 1} · ${escapeHtml(member.name)}</strong><small>${member.role === 'captain' ? 'Капитан · пропуск можно выдать адмиралом' : 'Матрос'} · пропуск действует</small></div><div class="admin-roster-actions">${member.role === 'captain' ? `<button type="button" data-admin-issue-captain-pass="${escapeHtml(team.id)}" ${editable ? '' : 'disabled'}>Выдать капитанский пропуск</button><button type="button" data-admin-demote="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>В матросы</button>` : `<button type="button" data-admin-promote="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>Сделать капитаном</button>`}<button type="button" data-admin-clear="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>Очистить слот</button><button type="button" class="danger-button" data-admin-dismiss="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>Списать</button></div></div>`);
     const empty = Array.from({ length: Math.max(0, 4 - team.members.length) }, (_, index) => `<div class="admin-roster-entry admin-roster-empty"><span class="crew-avatar" aria-hidden="true">${team.members.length + index + 1}</span><div><strong>СЛОТ ${team.members.length + index + 1} · свободен</strong><small>Можно заполнить только новым утверждённым участником.</small></div></div>`);
     list.innerHTML = [...filled, ...empty].join('');
+    renderAdminBenchAssign(team, editable);
+  }
+  function assignCandidateToTeam() {
+    if (!adminCanEdit()) { toast('Зачислить кандидата может только адмирал с правом редактирования.'); return; }
+    const team = teamById(state.adminTeamId);
+    const candidate = reserveById($('adminBenchCandidate')?.value);
+    const role = $('adminBenchRole')?.value === 'captain' ? 'captain' : 'member';
+    if (!team || !candidate) { toast('Выбери кандидата со скамейки.'); return; }
+    if (team.members.length >= 4) { toast('В этой команде уже заняты все четыре слота.'); return; }
+    if (!['reserve', 'proposed', 'approved'].includes(candidate.status)) { toast('Этот кандидат уже зачислен в другую команду.'); return; }
+    if (role === 'captain' && team.members.some((member) => member.role === 'captain')) { toast('В команде уже есть капитанский слот.'); return; }
+    const token = candidateToken();
+    team.members.push({ name: candidate.name, role, token });
+    candidate.status = 'assigned';
+    candidate.proposedTeamId = team.id;
+    state.teamProposals.filter((proposal) => proposal.candidateId === candidate.id).forEach((proposal) => { proposal.status = 'invited'; });
+    updateTeam(team);
+    save();
+    render();
+    copyPass(token);
+    toast(`${candidate.name} зачислен в «${team.name}». Новый пропуск подготовлен для передачи.`);
   }
   function issueCaptainPass(teamId) {
     if (!adminCanEdit()) { toast('Выдать капитанский пропуск может только адмирал с правом редактирования.'); return; }
@@ -1607,6 +1648,11 @@
     if (form.id === 'tournamentSettingsForm') {
       event.preventDefault();
       saveTournamentSettings();
+      return;
+    }
+    if (form.id === 'adminAssignBenchForm') {
+      event.preventDefault();
+      assignCandidateToTeam();
       return;
     }
     if (form.id === 'adminCreateTeamForm') {
