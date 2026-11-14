@@ -49,6 +49,7 @@
             <button type="button" data-role="matros"><span class="role-menu-emoji">◉</span><span><strong>Матрос</strong><small>Каюты, вахты, общение</small></span></button>
             <button type="button" data-role="captain"><span class="role-menu-emoji">⚑</span><span><strong>Капитан</strong><small>Экипаж и пропуска</small></span></button>
             <button type="button" data-role="admiral"><span class="role-menu-emoji">✦</span><span><strong>Адмирал</strong><small>Все каюты и сигналы</small></span></button>
+            <button type="button" id="returnDemoAdmin" class="demo-return-role" hidden><span class="role-menu-emoji">↩</span><span><strong>Вернуться к проверяющему админу</strong><small>Только для запущенного демо-теста</small></span></button>
             <div class="role-menu-note">До старта админка открыта всем посетителям. После старта право адмирала закрепляется за одним человеком. Для проверки демо адмирал может войти в роль участника по пропуску.</div>
           </div>
         </div>
@@ -172,6 +173,7 @@
     <div id="admiralView" class="view" hidden>
       <button type="button" class="back-link" data-go="home"><svg class="icon"><use href="#i-back"/></svg> На борт</button>
       <div class="inner-hero admiral-hero"><div><div class="eyebrow">АДМИРАЛЬСКИЙ МОСТИК / КООРДИНАТОР</div><h1>Все каюты<br><em>на одной карте.</em></h1><p>Подготовка, туры, чаты всех кают и срочные сигналы экипажей.</p></div><svg class="inner-hero-icon"><use href="#i-spark"/></svg></div>
+      <section class="admin-identity management-panel" id="adminIdentityPanel" aria-labelledby="adminIdentityHeading"><div class="section-heading"><div><div class="eyebrow">ПОДПИСЬ АДМИРАЛА</div><h2 id="adminIdentityHeading">Как тебя увидит экипаж?</h2><p>Имя хранится только в этой вкладке. Оно появится рядом с сообщениями адмирала в Кают-компании.</p></div></div><form id="adminIdentityForm" class="admin-identity-form"><label class="field-label" for="adminNameInput">ИМЯ АДМИРАЛА</label><div class="admin-identity-row"><input id="adminNameInput" type="text" maxlength="26" placeholder="Например, Нина" required><button type="submit" class="button button-outline" id="saveAdminName">Сохранить имя</button></div><small id="adminIdentityNote">Имя ещё не выбрано. Пока сообщения будут подписаны просто «Адмирал».</small></form></section>
       <section class="admiral-preparation management-panel" id="admiralPreparation" aria-labelledby="preparationHeading">
         <div class="section-heading"><div><div class="eyebrow">ПОДГОТОВКА / ОТКРЫТАЯ АДМИНКА</div><h2 id="preparationHeading">Настроить и начать турнир</h2><p>Любой посетитель общей ссылки может открыть этот режим до старта. Реальный адмирал просит остальных выйти перед подтверждением.</p></div><span class="live-tag"><span class="tiny-light"></span> ДО СТАРТА</span></div>
         <div class="admin-mode-status"><svg class="icon"><use href="#i-shield"/></svg><span id="admiralModeNote">Активных режимов адмирала: —</span></div>

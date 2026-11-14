@@ -22,12 +22,16 @@
   let adminSessionId = '';
   let sessionRole = 'matros';
   let sessionDisplayName = '';
+  let adminDisplayName = '';
+  let adminTestOrigin = false;
   let sessionCandidateId = '';
   try {
     adminSessionId = sessionStorage.getItem('kolfan-admin-session-id') || randomId('admin');
     sessionStorage.setItem('kolfan-admin-session-id', adminSessionId);
     sessionRole = sessionStorage.getItem('kolfan-role') || 'matros';
     sessionDisplayName = sessionStorage.getItem('kolfan-display-name') || '';
+    adminDisplayName = sessionStorage.getItem('kolfan-admin-display-name') || '';
+    adminTestOrigin = sessionStorage.getItem('kolfan-admin-test-origin') === '1';
     sessionCandidateId = sessionStorage.getItem('kolfan-candidate-id') || '';
   } catch (_) {
     adminSessionId = randomId('admin');
@@ -70,7 +74,7 @@
   ];
 
   const demoMessages = [
-    { id: 'g1', channel: 'global', author: 'Адмирал Нина', teamId: null, text: 'Кают-компания открыта. Всем спасибо за тур! Делитесь впечатлениями от рассказов.', at: startedAt - 48 * 60 * 1000 },
+    { id: 'g1', channel: 'global', author: 'Адмирал', teamId: null, text: 'Кают-компания открыта. Всем спасибо за тур! Делитесь впечатлениями от рассказов.', at: startedAt - 48 * 60 * 1000 },
     { id: 'g2', channel: 'global', author: 'Марта', teamId: 'archipelago', text: 'Перечитываю всё с самого начала. После дедлайна это ощущается совсем иначе ☕', at: startedAt - 26 * 60 * 1000 },
     { id: 'g3', channel: 'global', author: 'Ника', teamId: 'harbor', text: 'С кем можно обсудить опубликованные финалы? Обещаю предупреждать о спойлерах.', at: startedAt - 8 * 60 * 1000 },
     { id: 't1', channel: 'mayak', author: 'Мира', teamId: 'mayak', text: '@Лея, загляни в вахтенный график, пожалуйста. Если не успеваешь — просто маякни здесь.', at: startedAt - 62 * 60 * 1000 },
@@ -176,6 +180,10 @@
   state.createdTeams = state.createdTeams.map(normalizeCrew);
   originalTeams.forEach((team, index) => { originalTeams[index] = normalizeCrew(team); });
   state.teamData = (Array.isArray(state.teamData) ? state.teamData : []).map(normalizeCrew);
+  if (state.role !== 'admiral' && state.tournament.status === 'active' && state.tournament.adminOwnerSessionId === adminSessionId) {
+    adminTestOrigin = true;
+    try { sessionStorage.setItem('kolfan-admin-test-origin', '1'); } catch (_) { /* sessionStorage can be unavailable */ }
+  }
 
   let gateTeamId = null;
   let gatePurpose = 'member';
@@ -246,7 +254,17 @@
     return entries;
   }
   function activeAdminCount() { return activeAdminEntries().length; }
-  function isOwnerAdmin() { return state.role === 'admiral' && state.tournament.adminOwnerSessionId === adminSessionId; }
+  const ownsAdminSession = () => state.tournament?.adminOwnerSessionId === adminSessionId;
+  function isOwnerAdmin() { return state.role === 'admiral' && ownsAdminSession(); }
+  function markAdminTestOrigin() {
+    if (state.role !== 'admiral' || state.tournament.status !== 'active' || !ownsAdminSession()) return;
+    adminTestOrigin = true;
+    try { sessionStorage.setItem('kolfan-admin-test-origin', '1'); } catch (_) { /* sessionStorage can be unavailable */ }
+  }
+  function clearAdminTestOrigin() {
+    adminTestOrigin = false;
+    try { sessionStorage.removeItem('kolfan-admin-test-origin'); } catch (_) { /* sessionStorage can be unavailable */ }
+  }
   function leaveAdminPresence() {
     try {
       const active = readAdminPresence();
@@ -260,13 +278,15 @@
     const captain = captainMemberFor(teamId);
     return Boolean(captain && state.joined[teamId] === captain.name);
   };
+  const adminName = () => String(adminDisplayName || '').trim();
+  const adminAuthor = () => adminName() ? `Адмирал ${adminName()}` : 'Адмирал';
   const actorForTeam = (teamId) => {
-    if (state.role === 'admiral') return 'Адмирал Нина';
+    if (state.role === 'admiral') return adminAuthor();
     if (state.role === 'captain' && teamId === state.captainTeamId && hasCaptainAccess(teamId)) return captainMemberFor(teamId)?.name || 'Капитан';
     return state.joined[teamId] || null;
   };
   const globalIdentity = () => {
-    if (state.role === 'admiral') return { author: 'Адмирал Нина', teamId: null, actorType: 'admiral' };
+    if (state.role === 'admiral') return { author: adminAuthor(), teamId: null, actorType: 'admiral' };
     if (state.role === 'captain') return { author: teamById(state.captainTeamId)?.members.find((member) => member.role === 'captain')?.name || 'Капитан', teamId: state.captainTeamId, actorType: 'captain' };
     const id = state.joined[state.matrosTeamId] && teamById(state.matrosTeamId) ? state.matrosTeamId : Object.keys(state.joined).find((key) => teamById(key));
     if (id) return { author: state.joined[id] || 'Матрос', teamId: id, actorType: 'matros' };
@@ -368,6 +388,7 @@
   }
   function reopenPreparationAfterFinish() {
     leaveAdminPresence();
+    clearAdminTestOrigin();
     try { localStorage.removeItem(storageKey); } catch (_) { /* continue in memory */ }
     sessionRole = 'admiral';
     try { sessionStorage.setItem('kolfan-role', sessionRole); } catch (_) { /* sessionStorage can be unavailable */ }
@@ -377,10 +398,11 @@
     if (!['matros', 'captain', 'admiral'].includes(role)) return;
     const reopenedPreparation = role === 'admiral' && state.tournament.status === 'finished';
     if (reopenedPreparation) reopenPreparationAfterFinish();
-    if (role === 'admiral' && state.tournament.status !== 'preparation' && globalIdentity().actorType === 'junior') {
-      toast('Юнга видит только Кают-компанию. Адмиральская палуба закрыта.');
+    if (role === 'admiral' && state.tournament.status === 'active' && state.role !== 'admiral' && !(adminTestOrigin && ownsAdminSession())) {
+      toast('После старта обычный участник не входит в админку. Вернуться можно только из явно запущенной проверки демо.');
       return;
     }
+    if (role === 'captain' && state.role === 'admiral' && state.tournament.status === 'active' && ownsAdminSession()) markAdminTestOrigin();
     if (role === 'captain' && !hasCaptainAccess()) {
       openGate(null, 'captain');
       toast('Введи капитанский пропуск любой утверждённой команды.');
@@ -394,6 +416,7 @@
       const testTeam = teamById(state.matrosTeamId) && state.joined[state.matrosTeamId] ? teamById(state.matrosTeamId) : teamById(state.adminTeamId) || teams()[0];
       if (!testTeam) { toast('Сначала адмирал должен создать команду.'); return; }
       if (!testTeam.members.some((member) => member.role !== 'captain')) { toast('Сначала заполни хотя бы один матросский слот.'); return; }
+      markAdminTestOrigin();
       openGate(testTeam.id, 'member');
       toast('Для проверки во время тура введи личный пропуск матроса.');
       return;
@@ -402,7 +425,7 @@
     state.role = role;
     sessionRole = role;
     try { sessionStorage.setItem('kolfan-role', role); } catch (_) { /* sessionStorage can be unavailable */ }
-    if (role === 'admiral') refreshAdminPresence();
+    if (role === 'admiral') { clearAdminTestOrigin(); refreshAdminPresence(); }
     closeRoleMenu();
     closeNotifications();
     setView(role === 'admiral' ? 'admiral' : role === 'captain' ? 'captain' : 'home');
@@ -417,12 +440,14 @@
     if (state.role === 'admiral') refreshAdminPresence();
     const role = state.role;
     const identity = globalIdentity();
-    const name = role === 'admiral' ? 'Нина' : role === 'captain' ? teamById(state.captainTeamId)?.members.find((member) => member.role === 'captain')?.name || teamById(state.captainTeamId)?.members[0]?.name || 'Капитан' : identity.author;
+    const name = role === 'admiral' ? (adminName() || 'Адмирал') : role === 'captain' ? teamById(state.captainTeamId)?.members.find((member) => member.role === 'captain')?.name || teamById(state.captainTeamId)?.members[0]?.name || 'Капитан' : identity.author;
     $('roleAvatar').textContent = name[0] || '✦';
     const adminSuffix = role === 'admiral' && state.tournament.status === 'preparation' ? ' · подготовка' : '';
     const juniorTitle = role === 'matros' && identity.actorType === 'junior' ? (name === 'Юнга' ? 'Юнга' : `Юнга ${name}`) : '';
-    const roleTitle = juniorTitle || (role === 'admiral' ? `Адмирал ${name}` : role === 'captain' ? `Капитан ${name}` : `Матрос ${name}`);
+    const roleTitle = juniorTitle || (role === 'admiral' ? (adminName() ? `Адмирал ${name}` : 'Адмирал') : role === 'captain' ? `Капитан ${name}` : `Матрос ${name}`);
     $('roleTitle').textContent = roleTitle + adminSuffix;
+    const returnDemoAdmin = $('returnDemoAdmin');
+    if (returnDemoAdmin) returnDemoAdmin.hidden = !(role !== 'admiral' && state.tournament.status === 'active' && adminTestOrigin && ownsAdminSession());
     document.querySelectorAll('[data-role]').forEach((el) => el.setAttribute('aria-current', String(el.dataset.role === role)));
     const unread = role === 'admiral' ? allQuestions().filter((q) => !q.reply).length : mentionsForCurrentRole().length;
     $('notificationCount').hidden = unread === 0;
@@ -1353,9 +1378,26 @@
     }
   }
 
+  function renderAdminIdentity() {
+    const input = $('adminNameInput');
+    const note = $('adminIdentityNote');
+    if (input && document.activeElement !== input) input.value = adminName();
+    if (note) note.textContent = adminName() ? `Сообщения будут подписаны «Адмирал ${escapeHtml(adminName())}».` : 'Имя ещё не выбрано. Пока сообщения будут подписаны просто «Адмирал».';
+  }
+  function saveAdminName() {
+    if (state.role !== 'admiral') return;
+    const input = $('adminNameInput');
+    const name = (input?.value || '').trim().replace(/^адмирал\s+/i, '').slice(0, 26);
+    if (!name) { toast('Введи имя, под которым тебя увидит экипаж.'); input?.focus(); return; }
+    adminDisplayName = name;
+    try { sessionStorage.setItem('kolfan-admin-display-name', adminDisplayName); } catch (_) { /* sessionStorage can be unavailable */ }
+    render();
+    toast(`Теперь экипаж видит тебя как «Адмирал ${adminDisplayName}».`);
+  }
   function renderAdmiral() {
     const preparation = state.tournament.status === 'preparation';
     const owner = isOwnerAdmin();
+    renderAdminIdentity();
     const prepCard = $('admiralPreparation');
     const liveCard = $('admiralLiveControls');
     if (prepCard) prepCard.hidden = !preparation;
@@ -1522,11 +1564,15 @@
     if (target.closest('#demoTestMatros')) {
       const teamId = $('demoTestTeam')?.value || teams()[0]?.id;
       if (!teamId) { toast('Сначала адмирал должен создать команду.'); return; }
+      const team = teamById(teamId);
+      if (!team?.members.some((member) => member.role !== 'captain')) { toast('Сначала заполни хотя бы один матросский слот.'); return; }
+      markAdminTestOrigin();
       openGate(teamId, 'member');
       return;
     }
     if (target.closest('#demoTestCaptain')) {
       if (!teams().length) { toast('Сначала адмирал должен создать команду.'); return; }
+      markAdminTestOrigin();
       openGate(null, 'captain');
       return;
     }
@@ -1587,6 +1633,7 @@
       if (stage.closest('.locked-chat')) scrollToId('loungeSection');
       return;
     }
+    if (target.closest('#returnDemoAdmin')) { setRole('admiral'); return; }
     const role = target.closest('[data-role]');
     if (role) { setRole(role.dataset.role); return; }
     const room = target.closest('[data-open-room]');
@@ -1767,6 +1814,11 @@
       if (actor.actorType !== 'junior' && !state.joined[actor.teamId] && state.role !== 'captain') { toast('Сначала войди по личному пропуску команды.'); return; }
       state.questions.push({ id: 'q' + Date.now(), author: actor.author, teamId: actor.teamId, actorType: actor.actorType, text: text.slice(0, 360), at: Date.now(), reply: '' });
       $('urgentText').value = ''; save(); renderMyQuestions(); toast('Сигнал создан. В демо он виден на адмиральском мостике.'); return;
+    }
+    if (form.id === 'adminIdentityForm') {
+      event.preventDefault();
+      saveAdminName();
+      return;
     }
     if (form.id === 'tournamentSettingsForm') {
       event.preventDefault();

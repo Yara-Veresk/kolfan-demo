@@ -51,7 +51,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-vis
 .role-menu-emoji{color:var(--gold);font:21px/1 Georgia,serif;width:24px;text-align:center}
 .role-menu>button strong,.role-menu>button small{display:block}
 .role-menu>button strong{font-size:13px}.role-menu>button small{font-size:11px;color:var(--muted);margin-top:2px}
-.role-menu-note{border-top:1px solid var(--border);margin:5px 5px 2px;padding:10px 6px 4px;font-size:11px;line-height:1.45;color:var(--muted)}
+.role-menu-note{border-top:1px solid var(--border);margin:5px 5px 2px;padding:10px 6px 4px;font-size:11px;line-height:1.45;color:var(--muted)}.demo-return-role{border:1px solid rgba(230,180,115,.35)!important;background:rgba(230,180,115,.07)!important;margin-top:3px}.demo-return-role:hover{border-color:var(--gold)!important;background:rgba(230,180,115,.13)!important}
 
 /* Page framework */
 .page-shell{position:relative;max-width:1420px;margin:auto;padding:0 44px 0}
@@ -200,6 +200,7 @@ textarea:focus,input:focus,select:focus{border-color:var(--gold)!important;box-s
 .inner-hero h1{font:normal clamp(32px,3.3vw,49px)/1.1 Georgia,serif;letter-spacing:-.025em;margin:9px 0}.inner-hero p{font-size:13px;line-height:1.6;color:#c5d7cf;max-width:600px;margin:0}.inner-hero-icon{width:142px;height:142px;position:absolute;right:92px;top:40px;opacity:.17;color:var(--gold);transform:rotate(-15deg)}
 .management-grid,.admiral-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,.9fr);gap:22px;align-items:start;margin:23px 0 45px}
 .management-panel{min-width:0;border:1px solid var(--border);border-radius:12px;padding:25px;background:linear-gradient(142deg,#142932,#0e222b)}.management-panel .section-heading{margin-bottom:24px}.management-panel .section-heading h2{font-size:29px}
+.admin-identity{margin-bottom:22px;background:linear-gradient(135deg,#172f37,#10242c);border-color:#46615d}.admin-identity-form{max-width:720px}.admin-identity-row{display:flex;align-items:center;gap:9px}.admin-identity-row input{min-height:39px;min-width:0;flex:1;padding:8px 10px;background:#0b1b23;color:var(--cream);border:1px solid #35515a;border-radius:6px;font-size:13px}.admin-identity-row input:focus{border-color:var(--gold);outline:none;box-shadow:0 0 0 3px rgba(230,180,123,.11)}.admin-identity-row .button{min-height:39px;white-space:nowrap}.admin-identity-form>small{display:block;margin-top:7px;color:var(--muted);font-size:11px;line-height:1.45}
 .management-panel input,.management-panel select,.management-panel textarea{min-height:41px;padding:10px 12px;font-size:12px;color:var(--cream)}
 .management-panel select{background:#0b1b23;color:var(--cream);cursor:pointer}
 .management-panel .field-label{margin:18px 0 7px}.management-panel .field-label:first-of-type{margin-top:0}.optional{color:#7e9a98;font-size:9px;font-weight:600;letter-spacing:0}
@@ -251,3 +252,4 @@ body{font-size:16px}.nav-item{font-size:14px}.lounge-nav-item small{font-size:9p
 @media(max-width:610px){.nav-item{font-size:13px}.lounge-nav-item small{font-size:9px}.hero p{font-size:14px}.section-heading p{font-size:12px}.room-card-meta{font-size:12px}.message-body{font-size:14px}.chat-composer textarea{font-size:14px}.management-panel input,.management-panel select,.management-panel textarea{font-size:13px}}
 
 @media(max-width:610px){.live-admin-tools-grid{grid-template-columns:1fr}.live-admin-tool-danger{padding-left:0;padding-top:12px;border-left:0;border-top:1px solid var(--border-soft)}.live-admin-tool-row{align-items:stretch;flex-direction:column}.live-admin-tool-row .button{width:100%}.demo-role-tools-row{grid-template-columns:1fr}.demo-role-tools-row .button{width:100%}}
+@media(max-width:610px){.admin-identity-row{align-items:stretch;flex-direction:column}.admin-identity-row .button{width:100%}}
