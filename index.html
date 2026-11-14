@@ -7,8 +7,8 @@
   <meta name="theme-color" content="#091820">
   <meta name="description" content="Борт КолФан: каюты, вахты, кают-компания после дедлайна и сигналы адмиралу.">
   <title>Борт КолФан</title>
-  <link rel="stylesheet" href="styles.css?v=multi-tour-3">
-  <script src="app.js?v=multi-tour-3" defer></script>
+  <link rel="stylesheet" href="styles.css?v=unified-admiral-gate-1">
+  <script src="app.js?v=unified-admiral-gate-1" defer></script>
 </head>
 <body>
   <svg class="svg-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false">
@@ -49,8 +49,7 @@
             <button type="button" data-role="matros"><span class="role-menu-emoji">◉</span><span><strong>Матрос</strong><small>Каюты, вахты, общение</small></span></button>
             <button type="button" data-role="captain"><span class="role-menu-emoji">⚑</span><span><strong>Капитан</strong><small>Экипаж и пропуска</small></span></button>
             <button type="button" data-role="admiral"><span class="role-menu-emoji">✦</span><span><strong>Адмирал</strong><small>Все каюты и сигналы</small></span></button>
-            <button type="button" id="returnDemoAdmin" class="demo-return-role" hidden><span class="role-menu-emoji">↩</span><span><strong>Вернуться к проверяющему админу</strong><small>Только для запущенного демо-теста</small></span></button>
-            <div class="role-menu-note">До старта админка открыта всем посетителям. После старта право адмирала закрепляется за одним человеком. Для проверки демо адмирал может войти в роль участника по пропуску.</div>
+            <div class="role-menu-note">До старта админка открыта всем посетителям. После старта вход в админку выполняется по адмиральскому пропуску.</div>
           </div>
         </div>
       </div>
@@ -201,9 +200,9 @@
         <div class="section-heading"><div><div class="eyebrow">ТУРЫ / РУЧНОЕ УПРАВЛЕНИЕ</div><h2 id="tourControlHeading">Открыть следующий этап</h2><p>Участники видят только текущий тур. Адмирал читает завершённые.</p></div><span class="live-tag"><span class="tiny-light"></span> ЗАКРЕПЛЕНО</span></div>
         <div class="tour-control-row"><label class="field-label" for="admiralTourFilter">ВЫБРАТЬ ТУР</label><select id="admiralTourFilter"></select><button type="button" class="button button-primary" id="openSelectedTour">Открыть тур</button></div>
         <div class="tour-summary" id="admiralTourSummary"></div>
-        <section class="live-admin-tools" aria-labelledby="liveAdminToolsHeading"><div class="field-label" id="liveAdminToolsHeading">ТЕКУЩИЙ ТУР · АВАРИЙНОЕ УПРАВЛЕНИЕ</div><div class="live-admin-tools-grid"><div class="live-admin-tool"><label for="activeTourDeadline">ДЕДЛАЙН ТЕКУЩЕГО ТУРА</label><div class="live-admin-tool-row"><input id="activeTourDeadline" type="datetime-local"><button type="button" class="button button-outline" id="saveActiveTourDeadline">Сохранить срок</button></div><small id="activeTourDeadlineNote">Открой тур, чтобы изменить его дедлайн.</small></div><div class="live-admin-tool live-admin-tool-danger"><label>ЭКСТРЕННОЕ ЗАВЕРШЕНИЕ</label><p>Закрывает текущий тур прямо сейчас и переводит его в чтение.</p><button type="button" class="button button-quiet danger-outline" id="emergencyFinishTour">Аварийно завершить текущий тур</button></div></div></section>
+        <section class="live-admin-tools" aria-labelledby="liveAdminToolsHeading"><div class="field-label" id="liveAdminToolsHeading">ТЕКУЩИЙ ТУР · АВАРИЙНОЕ УПРАВЛЕНИЕ</div><div class="live-admin-tools-grid"><div class="live-admin-tool"><label for="activeTourDeadline">ДЕДЛАЙН ТЕКУЩЕГО ТУРА</label><div class="live-admin-tool-row"><input id="activeTourDeadline" type="datetime-local"><button type="button" class="button button-outline" id="saveActiveTourDeadline">Сохранить срок</button></div><small id="activeTourDeadlineNote">Открой тур, чтобы изменить его дедлайн.</small></div><div class="live-admin-tool live-admin-tool-danger"><label>ЭКСТРЕННОЕ ЗАВЕРШЕНИЕ</label><p>Закрывает текущий тур прямо сейчас и переводит его в чтение.</p><button type="button" class="button button-quiet danger-outline" id="emergencyFinishTour">Аварийно завершить текущий тур</button></div></div><div class="admin-recovery-code" id="adminRecoveryCodePanel"><div><label for="adminRecoveryCodeValue">АДМИРАЛЬСКИЙ ПРОПУСК</label><p>Надёжно сохраните этот пропуск на личном компьютере или в другом месте, доступном только вам.</p></div><div class="admin-recovery-code-row"><input id="adminRecoveryCodeValue" type="text" readonly aria-label="Адмиральский пропуск"><button type="button" class="button button-outline" id="copyAdminRecoveryCode">Скопировать пропуск</button></div></div></section>
         <div class="admin-transfer-panel" id="adminTransferPanel"></div>
-        <section class="demo-role-tools" id="demoRoleTools" aria-labelledby="demoRoleToolsHeading"><div class="field-label" id="demoRoleToolsHeading">ПРОВЕРКА РОЛИ В ДЕМО</div><p>После старта адмиральское право остаётся за этой сессией. Для проверки можно временно войти в каюту как матрос или капитан, затем вернуться в админку через меню роли.</p><div class="demo-role-tools-row"><label for="demoTestTeam">КОМАНДА ДЛЯ ПРОВЕРКИ</label><select id="demoTestTeam"></select><button type="button" class="button button-outline" id="demoTestMatros">Проверить как матрос</button><button type="button" class="button button-outline" id="demoTestCaptain">Проверить как капитан</button></div></section>
+        <section class="demo-role-tools" id="demoRoleTools" aria-labelledby="demoRoleToolsHeading"><div class="field-label" id="demoRoleToolsHeading">ПРОВЕРКА РОЛИ В ДЕМО</div><p>После старта адмиральское право остаётся за этой сессией. Для проверки можно временно войти в каюту как матрос или капитан; вернуть управление можно через меню роли и адмиральский пропуск.</p><div class="demo-role-tools-row"><label for="demoTestTeam">КОМАНДА ДЛЯ ПРОВЕРКИ</label><select id="demoTestTeam"></select><button type="button" class="button button-outline" id="demoTestMatros">Проверить как матрос</button><button type="button" class="button button-outline" id="demoTestCaptain">Проверить как капитан</button></div></section>
         <button type="button" class="button button-quiet danger-outline" id="finishTournament">Завершить турнир и удалить данные</button>
       </section>
       <section class="admiral-roster-panel management-panel" id="admiralRosterPanel" aria-labelledby="rosterAdminHeading">

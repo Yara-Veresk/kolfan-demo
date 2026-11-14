@@ -19,11 +19,16 @@
   const formatLocalDate = new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
   const cloneData = (value) => JSON.parse(JSON.stringify(value));
   const randomId = (prefix) => `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const normalizeRecoveryCode = (value) => String(value || '').toUpperCase().replace(/[\s-]/g, '');
+  const makeRecoveryCode = () => {
+    const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+    const part = () => Array.from({ length: 4 }, () => alphabet[Math.floor(Math.random() * alphabet.length)]).join('');
+    return `KOLFAN-${part()}-${part()}`;
+  };
   let adminSessionId = '';
   let sessionRole = 'matros';
   let sessionDisplayName = '';
   let adminDisplayName = '';
-  let adminTestOrigin = false;
   let sessionCandidateId = '';
   try {
     adminSessionId = sessionStorage.getItem('kolfan-admin-session-id') || randomId('admin');
@@ -31,7 +36,6 @@
     sessionRole = sessionStorage.getItem('kolfan-role') || 'matros';
     sessionDisplayName = sessionStorage.getItem('kolfan-display-name') || '';
     adminDisplayName = sessionStorage.getItem('kolfan-admin-display-name') || '';
-    adminTestOrigin = sessionStorage.getItem('kolfan-admin-test-origin') === '1';
     sessionCandidateId = sessionStorage.getItem('kolfan-candidate-id') || '';
   } catch (_) {
     adminSessionId = randomId('admin');
@@ -43,7 +47,7 @@
     return { id: `tour-${number}`, number, startAt: start, deadlineAt: start + 3 * 60 * 60 * 1000, status: 'planned', openedAt: null, completedAt: null };
   }
   function defaultTournament() {
-    return { status: 'preparation', tourCount: 4, tours: [1, 2, 3, 4].map((number) => makeTour(number)), activeTourId: null, adminOwnerSessionId: null, startedAt: null, finishedAt: null };
+    return { status: 'preparation', tourCount: 4, tours: [1, 2, 3, 4].map((number) => makeTour(number)), activeTourId: null, adminOwnerSessionId: null, adminRecoveryCode: null, startedAt: null, finishedAt: null };
   }
 
   const originalTeams = [
@@ -172,6 +176,7 @@
     const existing = Array.isArray(normalized.tours) ? normalized.tours : [];
     normalized.tours = Array.from({ length: requested }, (_, index) => normalizeTour(existing[index] || makeTour(index + 1), index));
     normalized.tourCount = requested;
+    if (typeof normalized.adminRecoveryCode !== 'string') normalized.adminRecoveryCode = null;
     if (!['preparation', 'active', 'finished'].includes(normalized.status)) normalized.status = 'preparation';
     if (!normalized.tours.some((tour) => tour.id === normalized.activeTourId)) normalized.activeTourId = normalized.tours.find((tour) => tour.status === 'active')?.id || null;
     return normalized;
@@ -180,10 +185,6 @@
   state.createdTeams = state.createdTeams.map(normalizeCrew);
   originalTeams.forEach((team, index) => { originalTeams[index] = normalizeCrew(team); });
   state.teamData = (Array.isArray(state.teamData) ? state.teamData : []).map(normalizeCrew);
-  if (state.role !== 'admiral' && state.tournament.status === 'active' && state.tournament.adminOwnerSessionId === adminSessionId) {
-    adminTestOrigin = true;
-    try { sessionStorage.setItem('kolfan-admin-test-origin', '1'); } catch (_) { /* sessionStorage can be unavailable */ }
-  }
 
   let gateTeamId = null;
   let gatePurpose = 'member';
@@ -256,15 +257,6 @@
   function activeAdminCount() { return activeAdminEntries().length; }
   const ownsAdminSession = () => state.tournament?.adminOwnerSessionId === adminSessionId;
   function isOwnerAdmin() { return state.role === 'admiral' && ownsAdminSession(); }
-  function markAdminTestOrigin() {
-    if (state.role !== 'admiral' || state.tournament.status !== 'active' || !ownsAdminSession()) return;
-    adminTestOrigin = true;
-    try { sessionStorage.setItem('kolfan-admin-test-origin', '1'); } catch (_) { /* sessionStorage can be unavailable */ }
-  }
-  function clearAdminTestOrigin() {
-    adminTestOrigin = false;
-    try { sessionStorage.removeItem('kolfan-admin-test-origin'); } catch (_) { /* sessionStorage can be unavailable */ }
-  }
   function leaveAdminPresence() {
     try {
       const active = readAdminPresence();
@@ -388,7 +380,6 @@
   }
   function reopenPreparationAfterFinish() {
     leaveAdminPresence();
-    clearAdminTestOrigin();
     try { localStorage.removeItem(storageKey); } catch (_) { /* continue in memory */ }
     sessionRole = 'admiral';
     try { sessionStorage.setItem('kolfan-role', sessionRole); } catch (_) { /* sessionStorage can be unavailable */ }
@@ -398,11 +389,11 @@
     if (!['matros', 'captain', 'admiral'].includes(role)) return;
     const reopenedPreparation = role === 'admiral' && state.tournament.status === 'finished';
     if (reopenedPreparation) reopenPreparationAfterFinish();
-    if (role === 'admiral' && state.tournament.status === 'active' && state.role !== 'admiral' && !(adminTestOrigin && ownsAdminSession())) {
-      toast('После старта обычный участник не входит в админку. Вернуться можно только из явно запущенной проверки демо.');
+    if (role === 'admiral' && state.tournament.status === 'active' && state.role !== 'admiral') {
+      openGate(null, 'admiral');
+      toast('Введи адмиральский пропуск, сохранённый после запуска турнира.');
       return;
     }
-    if (role === 'captain' && state.role === 'admiral' && state.tournament.status === 'active' && ownsAdminSession()) markAdminTestOrigin();
     if (role === 'captain' && !hasCaptainAccess()) {
       openGate(null, 'captain');
       toast('Введи капитанский пропуск любой утверждённой команды.');
@@ -416,7 +407,6 @@
       const testTeam = teamById(state.matrosTeamId) && state.joined[state.matrosTeamId] ? teamById(state.matrosTeamId) : teamById(state.adminTeamId) || teams()[0];
       if (!testTeam) { toast('Сначала адмирал должен создать команду.'); return; }
       if (!testTeam.members.some((member) => member.role !== 'captain')) { toast('Сначала заполни хотя бы один матросский слот.'); return; }
-      markAdminTestOrigin();
       openGate(testTeam.id, 'member');
       toast('Для проверки во время тура введи личный пропуск матроса.');
       return;
@@ -425,7 +415,7 @@
     state.role = role;
     sessionRole = role;
     try { sessionStorage.setItem('kolfan-role', role); } catch (_) { /* sessionStorage can be unavailable */ }
-    if (role === 'admiral') { clearAdminTestOrigin(); refreshAdminPresence(); }
+    if (role === 'admiral') refreshAdminPresence();
     closeRoleMenu();
     closeNotifications();
     setView(role === 'admiral' ? 'admiral' : role === 'captain' ? 'captain' : 'home');
@@ -446,8 +436,6 @@
     const juniorTitle = role === 'matros' && identity.actorType === 'junior' ? (name === 'Юнга' ? 'Юнга' : `Юнга ${name}`) : '';
     const roleTitle = juniorTitle || (role === 'admiral' ? (adminName() ? `Адмирал ${name}` : 'Адмирал') : role === 'captain' ? `Капитан ${name}` : `Матрос ${name}`);
     $('roleTitle').textContent = roleTitle + adminSuffix;
-    const returnDemoAdmin = $('returnDemoAdmin');
-    if (returnDemoAdmin) returnDemoAdmin.hidden = !(role !== 'admiral' && state.tournament.status === 'active' && adminTestOrigin && ownsAdminSession());
     document.querySelectorAll('[data-role]').forEach((el) => el.setAttribute('aria-current', String(el.dataset.role === role)));
     const unread = role === 'admiral' ? allQuestions().filter((q) => !q.reply).length : mentionsForCurrentRole().length;
     $('notificationCount').hidden = unread === 0;
@@ -941,10 +929,11 @@
     state.tournament.status = 'active';
     state.tournament.startedAt = Date.now();
     state.tournament.adminOwnerSessionId = adminSessionId;
+    state.tournament.adminRecoveryCode = state.tournament.adminRecoveryCode || makeRecoveryCode();
     state.tournament.activeTourId = null;
     save();
     render();
-    toast('Турнир начат. Открой первый тур вручную.');
+    toast(`Турнир начат. Открой первый тур вручную. Адмиральский пропуск: ${state.tournament.adminRecoveryCode}`);
   }
   function openSelectedTour() {
     if (!isOwnerAdmin() || state.tournament.status !== 'active') {
@@ -1031,7 +1020,20 @@
     render();
     toast('Полномочия переданы. Теперь эта админка работает только для чтения.');
   }
+  function ensureAdminRecoveryCode() {
+    if (state.tournament.status !== 'active' || !isOwnerAdmin()) return '';
+    if (!state.tournament.adminRecoveryCode) {
+      state.tournament.adminRecoveryCode = makeRecoveryCode();
+      save();
+    }
+    return state.tournament.adminRecoveryCode;
+  }
   function renderLiveAdminTools() {
+    const recoveryPanel = $('adminRecoveryCodePanel');
+    const recoveryInput = $('adminRecoveryCodeValue');
+    const recoveryVisible = state.tournament.status === 'active' && isOwnerAdmin();
+    if (recoveryPanel) recoveryPanel.hidden = !recoveryVisible;
+    if (recoveryInput) recoveryInput.value = recoveryVisible ? ensureAdminRecoveryCode() : '';
     const current = activeTour();
     const editable = isOwnerAdmin() && state.tournament.status === 'active' && Boolean(current) && !tourIsEnded(current);
     const deadlineInput = $('activeTourDeadline');
@@ -1462,18 +1464,21 @@
     gatePurpose = 'member';
     $('gateInput').value = '';
     $('gateError').hidden = true;
+    $('useDemoPass').hidden = false;
   }
   function openGate(teamId, purpose = 'member') {
-    gatePurpose = purpose === 'captain' ? 'captain' : 'member';
+    gatePurpose = ['captain', 'admiral'].includes(purpose) ? purpose : 'member';
     const team = teamId ? teamById(teamId) : null;
     if (gatePurpose === 'member' && !team) return;
-    gateTeamId = gatePurpose === 'captain' ? null : teamId;
+    gateTeamId = gatePurpose === 'member' ? teamId : null;
     const demoCaptainTeam = teamById(state.captainTeamId) || teams().find((item) => captainMemberFor(item.id));
-    $('gateTitle').textContent = gatePurpose === 'captain' ? 'Подтвердить капитанский пропуск' : 'Войти в каюту';
-    $('gatePassLabel').textContent = gatePurpose === 'captain' ? 'КАПИТАНСКИЙ ПРОПУСК' : 'ЛИЧНАЯ ССЫЛКА ОТ КАПИТАНА';
-    $('gateLegal').textContent = gatePurpose === 'captain' ? 'Введи пропуск капитана любой утверждённой команды. Команда определится по пропуску.' : 'Введи личный пропуск выбранной команды.';
+    const isAdmiralGate = gatePurpose === 'admiral';
+    $('gateTitle').textContent = isAdmiralGate ? 'Войти в админку' : gatePurpose === 'captain' ? 'Подтвердить капитанский пропуск' : 'Войти в каюту';
+    $('gatePassLabel').textContent = isAdmiralGate ? 'АДМИРАЛЬСКИЙ ПРОПУСК' : gatePurpose === 'captain' ? 'КАПИТАНСКИЙ ПРОПУСК' : 'ЛИЧНАЯ ССЫЛКА ОТ КАПИТАНА';
+    $('gateLegal').textContent = isAdmiralGate ? 'Вставь адмиральский пропуск, сохранённый после запуска турнира.' : gatePurpose === 'captain' ? 'Введи пропуск капитана любой утверждённой команды. Команда определится по пропуску.' : 'Введи личный пропуск выбранной команды.';
+    $('useDemoPass').hidden = isAdmiralGate;
     $('useDemoPass').textContent = gatePurpose === 'captain' ? `Вставить демо-пропуск капитана «${demoCaptainTeam?.name || 'первой команды'}»` : 'Вставить демо-пропуск для этой команды';
-    $('gateTeamName').textContent = gatePurpose === 'captain' ? 'Любая утверждённая команда · команда определится по пропуску' : `Команда «${team.name}» · ${team.members.length} на борту`;
+    $('gateTeamName').textContent = isAdmiralGate ? 'Текущий турнир · адмиральский доступ' : gatePurpose === 'captain' ? 'Любая утверждённая команда · команда определится по пропуску' : `Команда «${team.name}» · ${team.members.length} на борту`;
     $('gateInput').value = '';
     $('gateError').hidden = true;
     $('gateModal').hidden = false;
@@ -1538,6 +1543,22 @@
     if (state.view === 'room' && state.roomId === team.id && pendingTag) { insertTag(name, true); pendingTag = null; }
   }
 
+  async function copyAdminRecoveryCode() {
+    const code = state.tournament.adminRecoveryCode;
+    if (!code) { toast('Код появится после запуска турнира.'); return; }
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(code);
+      toast('Адмиральский пропуск скопирован.');
+    } catch (_) {
+      const tmp = document.createElement('textarea');
+      tmp.value = code; tmp.style.position = 'fixed'; tmp.style.opacity = '0'; document.body.appendChild(tmp); tmp.select();
+      let copied = false;
+      try { copied = document.execCommand('copy'); } catch (_) { /* sandboxed clipboard */ }
+      tmp.remove();
+      toast(copied ? 'Адмиральский пропуск скопирован.' : 'Скопируй адмиральский пропуск вручную.');
+    }
+  }
   async function copyPass(text) {
     try {
       if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
@@ -1561,18 +1582,17 @@
     if (target.closest('#openSelectedTour')) { openSelectedTour(); return; }
     if (target.closest('#saveActiveTourDeadline')) { saveActiveTourDeadline(); return; }
     if (target.closest('#emergencyFinishTour')) { emergencyFinishTour(); return; }
+    if (target.closest('#copyAdminRecoveryCode')) { copyAdminRecoveryCode(); return; }
     if (target.closest('#demoTestMatros')) {
       const teamId = $('demoTestTeam')?.value || teams()[0]?.id;
       if (!teamId) { toast('Сначала адмирал должен создать команду.'); return; }
       const team = teamById(teamId);
       if (!team?.members.some((member) => member.role !== 'captain')) { toast('Сначала заполни хотя бы один матросский слот.'); return; }
-      markAdminTestOrigin();
       openGate(teamId, 'member');
       return;
     }
     if (target.closest('#demoTestCaptain')) {
       if (!teams().length) { toast('Сначала адмирал должен создать команду.'); return; }
-      markAdminTestOrigin();
       openGate(null, 'captain');
       return;
     }
@@ -1633,7 +1653,6 @@
       if (stage.closest('.locked-chat')) scrollToId('loungeSection');
       return;
     }
-    if (target.closest('#returnDemoAdmin')) { setRole('admiral'); return; }
     const role = target.closest('[data-role]');
     if (role) { setRole(role.dataset.role); return; }
     const room = target.closest('[data-open-room]');
@@ -1707,7 +1726,10 @@
   });
 
   document.addEventListener('keydown', (event) => {
-    if (event.key === 'Escape') { if (!$('gateModal').hidden) { closeGate(); pendingTag = null; } else { closeRoleMenu(); closeNotifications(); $('mentionMenu').hidden = true; } }
+    if (event.key === 'Escape') {
+      if (!$('gateModal').hidden) { closeGate(); pendingTag = null; }
+      else { closeRoleMenu(); closeNotifications(); $('mentionMenu').hidden = true; }
+    }
   });
 
   $('teamChatText').addEventListener('input', () => {
@@ -1726,6 +1748,25 @@
     const form = event.target;
     if (form.id === 'gateForm') {
       event.preventDefault();
+      if (gatePurpose === 'admiral') {
+        const entered = normalizeRecoveryCode($('gateInput').value);
+        const expected = normalizeRecoveryCode(state.tournament.adminRecoveryCode);
+        if (state.tournament.status !== 'active' || !expected || entered !== expected) {
+          gateError('Адмиральский пропуск не подошёл для текущего турнира.');
+          return;
+        }
+        state.tournament.adminOwnerSessionId = adminSessionId;
+        state.role = 'admiral';
+        sessionRole = 'admiral';
+        try { sessionStorage.setItem('kolfan-role', sessionRole); } catch (_) { /* continue without session storage */ }
+        closeGate();
+        refreshAdminPresence();
+        save();
+        setView('admiral');
+        render();
+        toast('Адмиральское право восстановлено по пропуску.');
+        return;
+      }
       const holder = passHolder(parsePass($('gateInput').value));
       if (!holder) { gateError('Пропуск не найден. Попроси капитана прислать тебе личную ссылку.'); return; }
       if (gatePurpose !== 'captain' && holder.team.id !== gateTeamId) { gateError('Этот пропуск от другой команды. Для выбранной каюты нужна её личная ссылка.'); return; }
