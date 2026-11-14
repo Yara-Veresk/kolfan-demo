@@ -8,7 +8,7 @@
   const startedAt = Date.now();
   const demoDeadlineBefore = startedAt + 3 * 60 * 60 * 1000;
   const nextDeadline = startedAt + 32 * 60 * 60 * 1000;
-  const storageKey = 'kolfan-kubrik-static-demo-v3';
+  const storageKey = 'kolfan-kubrik-static-demo-v4';
   const adminPresenceKey = 'kolfan-kubrik-admin-presence-v1';
   const MIN_TEAMS = 4;
   const MAX_TEAMS = 12;
@@ -88,22 +88,29 @@
   ];
 
   const freshState = () => ({
-    role: sessionRole, stage: 'after', view: 'home', roomId: null, roomTourId: null,
-    matrosTeamId: 'mayak', captainTeamId: 'mayak', adminTeamId: 'mayak', adminFilter: 'all', adminTourId: 'tour-1',
-    engineUrl: '', joined: {}, teamData: cloneData(originalTeams), createdTeams: [],
+    role: sessionRole, stage: 'before', view: 'home', roomId: null, roomTourId: null,
+    matrosTeamId: null, captainTeamId: null, adminTeamId: null, adminFilter: 'all', adminTourId: 'tour-1',
+    engineUrl: '', joined: {}, teamData: [], createdTeams: [],
     reserveCandidates: [
       { id: 'reserve-maugli', name: 'Мауґли', desiredRole: 'member', status: 'reserve', availability: 'Готов играть', sessionId: null, proposedTeamId: null },
       { id: 'reserve-lada', name: 'Лада', desiredRole: 'member', status: 'reserve', availability: 'Готова играть', sessionId: null, proposedTeamId: null },
       { id: 'reserve-lev', name: 'Лев', desiredRole: 'captain', status: 'reserve', availability: 'Свободен до конца турнира', sessionId: null, proposedTeamId: null },
-      { id: 'reserve-sonya', name: 'Соня-Юнга', desiredRole: 'member', status: 'reserve', availability: 'Ждёт свободного слота', sessionId: null, proposedTeamId: null }
+      { id: 'reserve-sonya', name: 'Соня-Юнга', desiredRole: 'member', status: 'reserve', availability: 'Ждёт свободного слота', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-boris', name: 'Борис', desiredRole: 'captain', status: 'reserve', availability: 'Готов вести команду', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-ira', name: 'Ира', desiredRole: 'member', status: 'reserve', availability: 'Готова играть', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-kira', name: 'Кира', desiredRole: 'member', status: 'reserve', availability: 'Свободна по вечерам', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-max', name: 'Макс', desiredRole: 'member', status: 'reserve', availability: 'Готов играть', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-nora', name: 'Нора', desiredRole: 'captain', status: 'reserve', availability: 'Готова вести команду', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-oleg', name: 'Олег', desiredRole: 'member', status: 'reserve', availability: 'Готов играть', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-rina', name: 'Рина', desiredRole: 'member', status: 'reserve', availability: 'Свободна до конца турнира', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-stas', name: 'Стас', desiredRole: 'member', status: 'reserve', availability: 'Готов играть', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-taya', name: 'Тая', desiredRole: 'captain', status: 'reserve', availability: 'Готова вести команду', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-ulyana', name: 'Ульяна', desiredRole: 'member', status: 'reserve', availability: 'Готова играть', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-fedya', name: 'Федя', desiredRole: 'member', status: 'reserve', availability: 'Свободен по вечерам', sessionId: null, proposedTeamId: null },
+      { id: 'reserve-yana', name: 'Яна', desiredRole: 'member', status: 'reserve', availability: 'Готова играть', sessionId: null, proposedTeamId: null }
     ],
     teamProposals: [],
-    storyCards: [
-      { id: 'story-demo-mayak', tourId: 'tour-1', teamId: 'mayak', title: 'Свет в окне', topic: 'Что остаётся после возвращения?', published: true },
-      { id: 'story-demo-archipelago', tourId: 'tour-1', teamId: 'archipelago', title: 'Острова рядом', topic: 'Можно ли не потерять свой берег?', published: true },
-      { id: 'story-demo-harbor', tourId: 'tour-1', teamId: 'harbor', title: 'Тихая вода', topic: 'О чём говорит пауза?', published: true },
-      { id: 'story-demo-wind', tourId: 'tour-1', teamId: 'wind', title: 'По звёздам', topic: 'Как выбрать направление?', published: true }
-    ],
+    storyCards: [],
     storyLikes: {},
     tournament: defaultTournament(), watchPlans: {}, teamAvatars: {}, messages: [], questions: [], replies: {},
     notificationRead: false, readMentionIds: []
@@ -128,9 +135,10 @@
       if (!Array.isArray(state.questions)) state.questions = [];
       if (!Array.isArray(state.readMentionIds)) state.readMentionIds = [];
       if (!state.replies || typeof state.replies !== 'object') state.replies = {};
-      if (!['mayak', ...state.createdTeams.map((team) => team.id)].includes(state.captainTeamId)) state.captainTeamId = 'mayak';
-      if (!['mayak', ...state.createdTeams.map((team) => team.id)].includes(state.adminTeamId)) state.adminTeamId = 'mayak';
-      if (!['all', 'mayak', ...state.createdTeams.map((team) => team.id)].includes(state.adminFilter)) state.adminFilter = 'all';
+      const savedTeamIds = [...(Array.isArray(state.teamData) ? state.teamData : []), ...state.createdTeams].map((team) => team.id);
+      if (state.captainTeamId && !savedTeamIds.includes(state.captainTeamId)) state.captainTeamId = null;
+      if (state.adminTeamId && !savedTeamIds.includes(state.adminTeamId)) state.adminTeamId = null;
+      if (!['all', ...savedTeamIds].includes(state.adminFilter)) state.adminFilter = 'all';
       if (!state.tournament || typeof state.tournament !== 'object') state.tournament = defaultTournament();
       if (!Array.isArray(state.tournament.tours)) state.tournament.tours = defaultTournament().tours;
       if (!Number.isInteger(state.tournament.tourCount)) state.tournament.tourCount = state.tournament.tours.length || 4;
@@ -167,8 +175,7 @@
   state.tournament = normalizeTournament(state.tournament);
   state.createdTeams = state.createdTeams.map(normalizeCrew);
   originalTeams.forEach((team, index) => { originalTeams[index] = normalizeCrew(team); });
-  state.teamData = (Array.isArray(state.teamData) ? state.teamData : cloneData(originalTeams)).map(normalizeCrew);
-  originalTeams.forEach((team) => { if (!state.teamData.some((saved) => saved.id === team.id)) state.teamData.push(cloneData(team)); });
+  state.teamData = (Array.isArray(state.teamData) ? state.teamData : []).map(normalizeCrew);
 
   let gateTeamId = null;
   let gatePurpose = 'member';
@@ -208,7 +215,7 @@
   const timeMsk = (ms) => formatTimeMsk.format(new Date(ms));
   const dateMsk = (ms) => formatDateMsk.format(new Date(ms)) + ' МСК';
   const currentMessages = (channel, tourId = roomTour()?.id || 'tour-1') => [...(state.tournament.status === 'finished' ? [] : demoMessages), ...state.messages]
-    .filter((message) => message.channel === channel && (channel === 'global' || (message.tourId || 'tour-1') === tourId))
+    .filter((message) => message.channel === channel && (channel === 'global' || (teamById(message.teamId) && (message.tourId || 'tour-1') === tourId)))
     .sort((a, b) => a.at - b.at);
   function readAdminPresence() {
     try {
@@ -247,7 +254,7 @@
       localStorage.setItem(adminPresenceKey, JSON.stringify(active));
     } catch (_) { /* continue without presence tracking */ }
   }
-  const allQuestions = () => [...(state.tournament.status === 'finished' ? [] : demoQuestions), ...state.questions].map((q) => ({ ...q, reply: state.replies[q.id] || q.reply || '' }));
+  const allQuestions = () => [...(state.tournament.status === 'finished' ? [] : demoQuestions.filter((q) => teamById(q.teamId))), ...state.questions].map((q) => ({ ...q, reply: state.replies[q.id] || q.reply || '' }));
   const captainMemberFor = (teamId) => teamById(teamId)?.members.find((member) => member.role === 'captain') || null;
   const hasCaptainAccess = (teamId = state.captainTeamId) => {
     const captain = captainMemberFor(teamId);
@@ -366,9 +373,8 @@
       return;
     }
     if (role === 'captain' && !hasCaptainAccess()) {
-      const captainTeam = teamById(state.captainTeamId) || teams().find((team) => captainMemberFor(team.id));
-      if (captainTeam) openGate(captainTeam.id, 'captain');
-      toast('Сначала подтверди назначение капитанским пропуском.');
+      openGate(null, 'captain');
+      toast('Введи капитанский пропуск любой утверждённой команды.');
       return;
     }
     if (state.role === 'captain' && role === 'matros' && hasCaptainAccess()) {
@@ -415,15 +421,16 @@
   }
 
   function renderRooms() {
-    $('teamCount').textContent = String(teams().length).padStart(2, '0');
-    $('memberCount').textContent = String(teams().reduce((sum, team) => sum + team.members.length, 0)).padStart(2, '0');
-    $('roomsGrid').innerHTML = teams().map((team, index) => `
+    const roster = teams();
+    $('teamCount').textContent = String(roster.length).padStart(2, '0');
+    $('memberCount').textContent = String(roster.reduce((sum, team) => sum + team.members.length, 0)).padStart(2, '0');
+    $('roomsGrid').innerHTML = roster.length ? roster.map((team, index) => `
       <button class="room-card theme-${escapeHtml(team.theme || 'ochre')}" type="button" data-open-room="${escapeHtml(team.id)}" aria-label="Открыть каюту команды ${escapeHtml(team.name)}">
         <span class="room-card-top"><span>КОМАНДА ${String(index + 1).padStart(2, '0')}</span><svg class="icon"><use href="#i-spark"/></svg></span>
         ${state.joined[team.id] && state.role === 'matros' ? '<span class="room-card-identity">ТВОЙ ЭКИПАЖ</span>' : ''}
         <strong class="room-card-name">${escapeHtml(team.name)}</strong>
         <span class="room-card-bottom"><span class="room-card-meta"><strong>${team.members.filter((member) => member.role === 'captain').length ? '1 капитан' : 'капитанский слот свободен'} · ${team.members.filter((member) => member.role !== 'captain').length} матроса</strong> <span aria-hidden="true">·</span> ${state.tournament.status === 'preparation' ? 'подготовка' : teamAfterDeadline(team) ? 'чат только для чтения' : 'тур продолжается'}</span><span class="room-card-arrow">${ICON_ARROW}</span></span>
-      </button>`).join('');
+      </button>`).join('') : '<div class="rooms-empty"><strong>Официальных команд пока нет.</strong><span>Адмирал назначит капитана и соберёт первую каюту из скамейки запасных.</span></div>';
   }
 
   function messageHtml(message, showTeam = true) {
@@ -607,9 +614,19 @@
   }
 
   function renderWatch() {
-    const team = teamById('mayak');
-    if (!team) return;
     const now = Date.now();
+    $('headerClock').textContent = formatClockMsk.format(new Date(now));
+    const team = teamById(state.matrosTeamId) || teams()[0];
+    if (!team) {
+      $('watchTeamName').textContent = 'Команды пока нет';
+      $('watchName').textContent = '—';
+      $('watchNext').textContent = '—';
+      $('watchInterval').textContent = '—';
+      $('watchCountdown').textContent = '—';
+      $('watchLocal').hidden = true;
+      $('callWatch').innerHTML = `Позвать через @упоминание ${ICON_ARROW}`;
+      return;
+    }
     const tourId = state.view === 'room' ? (roomTour()?.id || 'tour-1') : (participantTour()?.id || 'tour-1');
     const duty = watchAt(team, now, tourId);
     $('watchTeamName').textContent = `Команда «${team.name}»`;
@@ -620,7 +637,6 @@
     $('watchLocal').textContent = `У тебя: ${formatLocalDate.format(new Date(duty.start))}–${formatLocalDate.format(new Date(duty.end))}`;
     $('watchCountdown').textContent = `через ${timeRemaining(duty.end - now)}`;
     $('callWatch').innerHTML = state.role === 'admiral' ? `Посмотреть вахты ${ICON_ARROW}` : `Позвать через @упоминание ${ICON_ARROW}`;
-    $('headerClock').textContent = formatClockMsk.format(new Date(now));
     if (state.stage === 'after' && now >= nextDeadline && $('generalChatForm')) renderGeneral();
     if (state.view === 'room') {
       const roomTeam = teamById(state.roomId);
@@ -742,7 +758,7 @@
 
   function renderCaptain() {
     const captainTeams = teams().filter((team) => hasCaptainAccess(team.id));
-    if (!captainTeams.some((team) => team.id === state.captainTeamId)) state.captainTeamId = captainTeams[0]?.id || 'mayak';
+    if (!captainTeams.some((team) => team.id === state.captainTeamId)) state.captainTeamId = captainTeams[0]?.id || null;
     if (!captainTeams.length) { setView('home'); renderHome(); return; }
     $('captainTeamSelect').innerHTML = captainTeams.map((team) => `<option value="${escapeHtml(team.id)}" ${team.id === state.captainTeamId ? 'selected' : ''}>${escapeHtml(team.name)}</option>`).join('');
     const team = teamById(state.captainTeamId);
@@ -1022,11 +1038,16 @@
     const select = $('admiralTeamSelect');
     const list = $('admiralRoster');
     if (!select || !list) return;
-    if (!teamById(state.adminTeamId)) state.adminTeamId = teams()[0]?.id || 'mayak';
+    if (!teamById(state.adminTeamId)) state.adminTeamId = teams()[0]?.id || null;
     select.innerHTML = teams().map((team) => `<option value="${escapeHtml(team.id)}">${escapeHtml(team.name)}</option>`).join('');
-    select.value = state.adminTeamId;
+    select.value = state.adminTeamId || '';
     const team = teamById(state.adminTeamId);
-    if (!team) { list.innerHTML = ''; return; }
+    if (!team) {
+      list.innerHTML = '';
+      const benchPanel = $('admiralBenchAssign');
+      if (benchPanel) benchPanel.innerHTML = '<div class="bench-assign-note"><strong>Команд пока нет.</strong><span>Сначала создай официальную команду из скамейки запасных.</span></div>';
+      return;
+    }
     const editable = adminCanEdit();
     const filled = team.members.map((member, index) => `<div class="admin-roster-entry"><span class="crew-avatar" aria-hidden="true">${escapeHtml(member.name[0] || '✦')}</span><div><strong>СЛОТ ${index + 1} · ${escapeHtml(member.name)}</strong><small>${member.role === 'captain' ? 'Капитан · пропуск можно выдать адмиралом' : 'Матрос'} · пропуск действует</small></div><div class="admin-roster-actions">${member.role === 'captain' ? `<button type="button" data-admin-issue-captain-pass="${escapeHtml(team.id)}" ${editable ? '' : 'disabled'}>Выдать капитанский пропуск</button><button type="button" data-admin-demote="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>В матросы</button>` : `<button type="button" data-admin-promote="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>Сделать капитаном</button>`}<button type="button" data-admin-clear="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>Очистить слот</button><button type="button" class="danger-button" data-admin-dismiss="${escapeHtml(member.name)}" ${editable ? '' : 'disabled'}>Списать</button></div></div>`);
     const empty = Array.from({ length: Math.max(0, 4 - team.members.length) }, (_, index) => `<div class="admin-roster-entry admin-roster-empty"><span class="crew-avatar" aria-hidden="true">${team.members.length + index + 1}</span><div><strong>СЛОТ ${team.members.length + index + 1} · свободен</strong><small>Можно заполнить только новым утверждённым участником.</small></div></div>`);
@@ -1196,8 +1217,13 @@
     const name = $('assemblyTeamName')?.value.trim();
     const captainId = $('assemblyCaptainCandidate')?.value;
     const selected = [...document.querySelectorAll('#assemblyBenchChoices input[type="checkbox"]:checked')].map((input) => input.value);
-    if (!name || selected.length !== 4 || !selected.includes(captainId)) {
-      toast('Выбери ровно четырёх кандидатов и назначь капитана из них.');
+    if (!name || selected.length < 1 || selected.length > 4 || !selected.includes(captainId)) {
+      toast('Выбери от одного до четырёх кандидатов и обязательно назначь капитана из них.');
+      return;
+    }
+    const normalizedName = name.toLocaleLowerCase('ru-RU');
+    if (teams().some((team) => String(team.name || '').trim().toLocaleLowerCase('ru-RU') === normalizedName)) {
+      toast('Команда с таким названием уже есть. Придумай уникальное название.');
       return;
     }
     const candidates = selected.map(reserveById);
@@ -1219,7 +1245,7 @@
     state.captainTeamId = id;
     save();
     render();
-    toast(`Команда «${team.name}» создана из четырёх кандидатов. Капитан назначен адмиралом.`);
+    toast(`Команда «${team.name}» создана из ${members.length} ${members.length === 1 ? 'кандидата' : 'кандидатов'}. Капитан назначен адмиралом.`);
   }
   function renderCaptainCandidates(team) {
     const panel = $('captainInvitePanel');
@@ -1278,7 +1304,7 @@
     renderAdminRoster();
     const selectedTourId = state.adminTourId || activeTour()?.id || 'tour-1';
     const feed = [...(state.tournament.status === 'finished' ? [] : demoMessages), ...state.messages]
-      .filter((msg) => msg.channel !== 'global' && (msg.tourId || 'tour-1') === selectedTourId && (state.adminFilter === 'all' || state.adminFilter === msg.teamId))
+      .filter((msg) => msg.channel !== 'global' && teamById(msg.teamId) && (msg.tourId || 'tour-1') === selectedTourId && (state.adminFilter === 'all' || state.adminFilter === msg.teamId))
       .sort((a, b) => b.at - a.at).slice(0, 18);
     $('allTeamMessages').innerHTML = feed.length ? feed.map((msg) => `<article class="feed-entry"><div class="feed-entry-head"><strong>${escapeHtml(msg.author)}</strong><span>${escapeHtml(teamById(msg.teamId)?.name || 'Команда')}</span></div><p>${richText(msg.text)}</p><button type="button" data-admin-room="${escapeHtml(msg.teamId)}" data-admin-tour="${escapeHtml(msg.tourId || 'tour-1')}">Открыть каюту · тур ${escapeHtml(String(tourById(msg.tourId || 'tour-1')?.number || 1))} ${ICON_ARROW}</button></article>`).join('') : '<p class="message-body">В выбранном туре и фильтре пока тихо.</p>';
     $('admiralQuestions').innerHTML = allQuestions().sort((a, b) => b.at - a.at).map((q) => `<article class="inbox-entry"><div class="inbox-top"><div><strong>${escapeHtml(q.author)}</strong><small>${escapeHtml(teamById(q.teamId)?.name || 'Без команды')} · ${timeMsk(q.at)} МСК</small></div><span class="inbox-status ${q.reply ? 'answered' : ''}">${q.reply ? 'ОТВЕЧЕНО' : 'ЖДЁТ ОТВЕТА'}</span></div><p>${escapeHtml(q.text)}</p>${q.reply ? `<div class="inbox-reply">Ответ: ${escapeHtml(q.reply)}</div>` : `<form class="reply-form" data-question="${escapeHtml(q.id)}"><label class="sr-only" for="reply-${escapeHtml(q.id)}">Ответ ${escapeHtml(q.author)}</label><input id="reply-${escapeHtml(q.id)}" type="text" maxlength="360" placeholder="Ответить лично…" required><button type="submit">Ответить</button></form>`}</article>`).join('');
@@ -1323,15 +1349,16 @@
     $('gateError').hidden = true;
   }
   function openGate(teamId, purpose = 'member') {
-    const team = teamById(teamId);
-    if (!team) return;
-    gateTeamId = teamId;
     gatePurpose = purpose === 'captain' ? 'captain' : 'member';
+    const team = teamId ? teamById(teamId) : null;
+    if (gatePurpose === 'member' && !team) return;
+    gateTeamId = gatePurpose === 'captain' ? null : teamId;
+    const demoCaptainTeam = teamById(state.captainTeamId) || teams().find((item) => captainMemberFor(item.id));
     $('gateTitle').textContent = gatePurpose === 'captain' ? 'Подтвердить капитанский пропуск' : 'Войти в каюту';
     $('gatePassLabel').textContent = gatePurpose === 'captain' ? 'КАПИТАНСКИЙ ПРОПУСК' : 'ЛИЧНАЯ ССЫЛКА ОТ КАПИТАНА';
-    $('gateLegal').textContent = gatePurpose === 'captain' ? 'Капитанский мостик открывается только личным пропуском назначенного капитана.' : 'Введи личный пропуск выбранной команды.';
-    $('useDemoPass').textContent = gatePurpose === 'captain' ? 'Вставить демо-пропуск капитана' : 'Вставить демо-пропуск для этой команды';
-    $('gateTeamName').textContent = `Команда «${team.name}» · ${team.members.length} на борту`;
+    $('gateLegal').textContent = gatePurpose === 'captain' ? 'Введи пропуск капитана любой утверждённой команды. Команда определится по пропуску.' : 'Введи личный пропуск выбранной команды.';
+    $('useDemoPass').textContent = gatePurpose === 'captain' ? `Вставить демо-пропуск капитана «${demoCaptainTeam?.name || 'первой команды'}»` : 'Вставить демо-пропуск для этой команды';
+    $('gateTeamName').textContent = gatePurpose === 'captain' ? 'Любая утверждённая команда · команда определится по пропуску' : `Команда «${team.name}» · ${team.members.length} на борту`;
     $('gateInput').value = '';
     $('gateError').hidden = true;
     $('gateModal').hidden = false;
@@ -1387,11 +1414,13 @@
     scrollToId('roomChatSection');
   }
   function callCurrentWatch() {
-    if (state.role === 'admiral') { openRoom('mayak'); scrollToId('roomScheduleSection'); return; }
-    const name = watchAt(teamById('mayak')).member.name;
-    pendingTag = { teamId: 'mayak', name };
-    openRoom('mayak');
-    if (state.view === 'room' && state.roomId === 'mayak' && pendingTag) { insertTag(name, true); pendingTag = null; }
+    const team = teamById(state.matrosTeamId) || teams()[0];
+    if (!team) { toast('Сначала адмирал должен создать хотя бы одну команду.'); return; }
+    if (state.role === 'admiral') { openRoom(team.id); scrollToId('roomScheduleSection'); return; }
+    const name = watchAt(team).member.name;
+    pendingTag = { teamId: team.id, name };
+    openRoom(team.id);
+    if (state.view === 'room' && state.roomId === team.id && pendingTag) { insertTag(name, true); pendingTag = null; }
   }
 
   async function copyPass(text) {
@@ -1510,7 +1539,7 @@
     if (target.closest('#closeGate')) { closeGate(); pendingTag = null; return; }
     if (target === $('gateModal')) { closeGate(); pendingTag = null; return; }
     if (target.closest('#useDemoPass')) {
-      const team = teamById(gateTeamId);
+      const team = gatePurpose === 'captain' ? (teamById(state.captainTeamId) || teams().find((item) => captainMemberFor(item.id))) : teamById(gateTeamId);
       if (!team) return;
       const demoMember = gatePurpose === 'captain' ? team.members.find((member) => member.role === 'captain') : team.members.find((member) => member.name === team.demoName) || team.members[1] || team.members[0];
       $('gateInput').value = demoMember?.token || '';
@@ -1558,7 +1587,7 @@
       event.preventDefault();
       const holder = passHolder(parsePass($('gateInput').value));
       if (!holder) { gateError('Пропуск не найден. Попроси капитана прислать тебе личную ссылку.'); return; }
-      if (holder.team.id !== gateTeamId) { gateError('Этот пропуск от другой команды. Для выбранной каюты нужна её личная ссылка.'); return; }
+      if (gatePurpose !== 'captain' && holder.team.id !== gateTeamId) { gateError('Этот пропуск от другой команды. Для выбранной каюты нужна её личная ссылка.'); return; }
       if (gatePurpose === 'captain' && holder.member.role !== 'captain') { gateError('Для капитанского мостика нужен пропуск назначенного капитана.'); return; }
       const captainBridgeRequested = gatePurpose === 'captain';
       state.joined[holder.team.id] = holder.member.name;
