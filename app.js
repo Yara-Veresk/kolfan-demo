@@ -8,7 +8,7 @@
   const startedAt = Date.now();
   const demoDeadlineBefore = startedAt + 3 * 60 * 60 * 1000;
   const nextDeadline = startedAt + 32 * 60 * 60 * 1000;
-  const storageKey = 'kolfan-kubrik-static-demo-v4';
+  const storageKey = 'kolfan-kubrik-static-demo-v5';
   const adminPresenceKey = 'kolfan-kubrik-admin-presence-v1';
   const MIN_TEAMS = 4;
   const MAX_TEAMS = 12;
@@ -366,8 +366,17 @@
     if (where === 'lounge') scrollToId('loungeSection');
     if (where === 'watch') scrollToId('watchSection');
   }
+  function reopenPreparationAfterFinish() {
+    leaveAdminPresence();
+    try { localStorage.removeItem(storageKey); } catch (_) { /* continue in memory */ }
+    sessionRole = 'admiral';
+    try { sessionStorage.setItem('kolfan-role', sessionRole); } catch (_) { /* sessionStorage can be unavailable */ }
+    state = freshState();
+  }
   function setRole(role) {
     if (!['matros', 'captain', 'admiral'].includes(role)) return;
+    const reopenedPreparation = role === 'admiral' && state.tournament.status === 'finished';
+    if (reopenedPreparation) reopenPreparationAfterFinish();
     if (role === 'admiral' && state.tournament.status !== 'preparation' && globalIdentity().actorType === 'junior') {
       toast('Юнга видит только Кают-компанию. Адмиральская палуба закрыта.');
       return;
@@ -396,7 +405,7 @@
     render();
     save();
     toast(role === 'admiral'
-      ? (state.tournament.status === 'preparation' ? 'Открыта общая подготовительная админка. Перед стартом предупреди команды.' : isOwnerAdmin() ? 'Адмиральское право закреплено за этой сессией.' : 'Открыта админка только для чтения.')
+      ? (reopenedPreparation ? 'Предыдущий турнир завершён. Открыта новая подготовка: адмиральский доступ снова свободен.' : state.tournament.status === 'preparation' ? 'Открыта общая подготовительная админка. Перед стартом предупреди команды.' : isOwnerAdmin() ? 'Адмиральское право закреплено за этой сессией.' : 'Открыта админка только для чтения.')
       : role === 'captain' ? 'Открыт капитанский мостик.' : 'Теперь ты матрос. Добро пожаловать на борт!');
   }
 
@@ -476,7 +485,8 @@
       return;
     }
     const ownCandidate = sessionCandidateId ? reserveById(sessionCandidateId) : null;
-    const juniorIdentity = isJunior ? `<div class="junior-compose"><label class="field-label" for="juniorNameInput">ТВОЙ НИК НА БОРТУ</label><input id="juniorNameInput" type="text" maxlength="26" value="${escapeHtml(sessionDisplayName)}" placeholder="Например, Ласточка" required><label class="field-label" for="juniorDesiredRole">КОГО ИЩЕМ В ЭКИПАЖ</label><select id="juniorDesiredRole"><option value="member" ${ownCandidate && ownCandidate.desiredRole !== 'captain' ? 'selected' : ''}>Матроса</option><option value="captain" ${ownCandidate && ownCandidate.desiredRole === 'captain' ? 'selected' : ''}>Капитана</option></select><small>Пока ты Юнга: каютный пропуск не нужен. Решение о зачислении в экипаж принимает адмирал.</small></div>` : '';
+    const desiredRole = ownCandidate?.desiredRole === 'captain' ? 'captain' : 'member';
+    const juniorIdentity = isJunior ? `<div class="junior-compose"><label class="field-label" for="juniorNameInput">ТВОЙ НИК НА БОРТУ</label><input id="juniorNameInput" type="text" maxlength="26" value="${escapeHtml(sessionDisplayName)}" placeholder="Например, Ласточка" required><span class="field-label">КОГО ИЩЕМ В ЭКИПАЖ</span><input id="juniorDesiredRole" type="hidden" value="${desiredRole}"><div class="junior-role-choices" role="group" aria-label="Желаемая роль"><button type="button" class="junior-role-choice ${desiredRole === 'member' ? 'is-selected' : ''}" data-junior-role-choice="member">Хочу в матросы</button><button type="button" class="junior-role-choice ${desiredRole === 'captain' ? 'is-selected' : ''}" data-junior-role-choice="captain">Хочу в капитаны</button></div><small>Пока ты Юнга: каютный пропуск не нужен. Решение о зачислении в экипаж принимает адмирал.</small></div>` : '';
     const benchAction = isJunior
       ? juniorCandidate?.status === 'assigned'
         ? '<div class="junior-bench-state"><span class="tiny-light"></span> Место уже утверждено. Жди новый личный пропуск от капитана.</div>'
@@ -1480,6 +1490,13 @@
     if (storyCardButton) {
       const choice = $('storyCardChoice');
       if (choice) { choice.value = storyCardButton.dataset.storyCard; choice.focus(); scrollToId('storyDiscussionForm'); }
+      return;
+    }
+    const juniorRoleChoice = target.closest('[data-junior-role-choice]');
+    if (juniorRoleChoice) {
+      const input = $('juniorDesiredRole');
+      if (input) input.value = juniorRoleChoice.dataset.juniorRoleChoice === 'captain' ? 'captain' : 'member';
+      document.querySelectorAll('[data-junior-role-choice]').forEach((button) => button.classList.toggle('is-selected', button === juniorRoleChoice));
       return;
     }
     if (target.closest('[data-join-bench]')) { joinReserveBench(); return; }
