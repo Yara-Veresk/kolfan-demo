@@ -390,8 +390,12 @@
       toast('Капитанский пропуск уже назначает тебе роль капитана.');
       return;
     }
-    if (state.role === 'admiral' && isOwnerAdmin() && state.tournament.status === 'active' && role !== 'admiral') {
-      toast('После старта адмирал не может перейти в игровую роль. Заверши турнир или передай полномочия между турнирами.');
+    if (state.role === 'admiral' && isOwnerAdmin() && state.tournament.status === 'active' && role === 'matros') {
+      const testTeam = teamById(state.matrosTeamId) && state.joined[state.matrosTeamId] ? teamById(state.matrosTeamId) : teamById(state.adminTeamId) || teams()[0];
+      if (!testTeam) { toast('Сначала адмирал должен создать команду.'); return; }
+      if (!testTeam.members.some((member) => member.role !== 'captain')) { toast('Сначала заполни хотя бы один матросский слот.'); return; }
+      openGate(testTeam.id, 'member');
+      toast('Для проверки во время тура введи личный пропуск матроса.');
       return;
     }
     if (state.role === 'admiral' && role !== 'admiral') leaveAdminPresence();
@@ -1002,6 +1006,61 @@
     render();
     toast('Полномочия переданы. Теперь эта админка работает только для чтения.');
   }
+  function renderLiveAdminTools() {
+    const current = activeTour();
+    const editable = isOwnerAdmin() && state.tournament.status === 'active' && Boolean(current) && !tourIsEnded(current);
+    const deadlineInput = $('activeTourDeadline');
+    const deadlineButton = $('saveActiveTourDeadline');
+    const emergencyButton = $('emergencyFinishTour');
+    const note = $('activeTourDeadlineNote');
+    if (deadlineInput) {
+      if (document.activeElement !== deadlineInput) deadlineInput.value = current ? mskInputValue(current.deadlineAt) : '';
+      deadlineInput.disabled = !editable;
+    }
+    if (deadlineButton) deadlineButton.disabled = !editable;
+    if (emergencyButton) emergencyButton.disabled = !editable;
+    if (note) note.textContent = !current ? 'Открой тур, чтобы изменить его дедлайн.' : tourIsEnded(current) ? 'Тур уже завершён. Сроки завершённого этапа не меняются.' : editable ? `Тур ${current.number}: можно поставить срок в прошлом для проверки завершения.` : 'Изменять срок может только закреплённый адмирал.';
+
+    const teamSelect = $('demoTestTeam');
+    const matrosButton = $('demoTestMatros');
+    const captainButton = $('demoTestCaptain');
+    const selectedTestTeamId = $('demoTestTeam')?.value || state.adminTeamId || teams()[0]?.id;
+    const testTeam = teamById(selectedTestTeamId) || teams()[0];
+    const hasSailor = Boolean(testTeam?.members.some((member) => member.role !== 'captain'));
+    if (teamSelect) {
+      teamSelect.innerHTML = teams().map((team) => `<option value="${escapeHtml(team.id)}">${escapeHtml(team.name)}</option>`).join('');
+      teamSelect.value = state.adminTeamId && teamById(state.adminTeamId) ? state.adminTeamId : teams()[0]?.id || '';
+      teamSelect.disabled = !editable || !teams().length;
+    }
+    if (matrosButton) { matrosButton.disabled = !editable || !hasSailor; matrosButton.title = hasSailor ? '' : 'Сначала заполни хотя бы один матросский слот.'; }
+    if (captainButton) captainButton.disabled = !editable || !teams().length;
+  }
+  function saveActiveTourDeadline() {
+    if (!isOwnerAdmin() || state.tournament.status !== 'active') { toast('Менять дедлайн может только закреплённый адмирал во время турнира.'); return; }
+    const tour = activeTour();
+    const deadline = parseMskInput($('activeTourDeadline')?.value || '');
+    if (!tour) { toast('Сначала открой текущий тур.'); return; }
+    if (tourIsEnded(tour)) { toast('Этот тур уже завершён и не возобновляется.'); return; }
+    if (!Number.isFinite(deadline) || deadline <= Number(tour.startAt)) { toast('Дедлайн должен быть позже старта тура.'); return; }
+    tour.deadlineAt = deadline;
+    save();
+    render();
+    toast(`Дедлайн тура ${tour.number} передвинут на ${dateMsk(deadline)}.`);
+  }
+  function emergencyFinishTour() {
+    if (!isOwnerAdmin() || state.tournament.status !== 'active') { toast('Аварийно завершить тур может только закреплённый адмирал.'); return; }
+    const tour = activeTour();
+    if (!tour) { toast('Сейчас нет открытого тура.'); return; }
+    if (!window.confirm(`Аварийно завершить тур ${tour.number} прямо сейчас? После этого участники увидят его только для чтения.`)) return;
+    tour.status = 'completed';
+    tour.completedAt = Date.now();
+    tour.deadlineAt = Math.min(Number(tour.deadlineAt) || Date.now(), Date.now());
+    state.tournament.activeTourId = null;
+    state.adminTourId = state.tournament.tours.find((item) => item.status === 'planned')?.id || tour.id;
+    save();
+    render();
+    toast(`Тур ${tour.number} аварийно завершён. Его чаты доступны для чтения.`);
+  }
   function renderAdminTourControls() {
     const select = $('admiralTourFilter');
     if (!select) return;
@@ -1012,17 +1071,21 @@
     select.value = state.adminTourId || '';
     const summary = $('admiralTourSummary');
     const next = state.tournament.tours.find((tour) => tour.status === 'planned');
+    const completed = state.tournament.tours.find((tour) => tour.status === 'completed');
     if (summary) summary.innerHTML = state.tournament.status === 'preparation'
       ? '<strong>Подготовка открыта.</strong><span>После сохранения расписания адмирал попросит команды выйти из админки.</span>'
       : state.tournament.status === 'finished'
         ? '<strong>Турнир завершён.</strong><span>Данные Борта удалены без архива.</span>'
         : current
           ? `<strong>Сейчас тур ${current.number}: ${escapeHtml(tourStatusText(current))}.</strong><span>Дедлайн: ${escapeHtml(dateMsk(current.deadlineAt))}. Завершённые этапы не возобновляются.</span>`
-          : '<strong>Первый тур ещё не открыт.</strong><span>Выбери тур и нажми «Открыть тур» вручную.</span>';
+          : completed && next
+            ? `<strong>Тур ${completed.number} завершён.</strong><span>Можно открыть тур ${next.number} вручную.</span>`
+            : '<strong>Первый тур ещё не открыт.</strong><span>Выбери тур и нажми «Открыть тур» вручную.</span>';
     const openButton = $('openSelectedTour');
     if (openButton) openButton.disabled = !isOwnerAdmin() || !next || Boolean(current && !tourIsEnded(current));
     const finishButton = $('finishTournament');
     if (finishButton) finishButton.disabled = !isOwnerAdmin();
+    renderLiveAdminTools();
   }
   function renderAdminBenchAssign(team, editable) {
     const panel = $('admiralBenchAssign');
@@ -1454,6 +1517,19 @@
     if (target.closest('#saveTournamentSettings')) { saveTournamentSettings(); return; }
     if (target.closest('#startTournament')) { startTournament(); return; }
     if (target.closest('#openSelectedTour')) { openSelectedTour(); return; }
+    if (target.closest('#saveActiveTourDeadline')) { saveActiveTourDeadline(); return; }
+    if (target.closest('#emergencyFinishTour')) { emergencyFinishTour(); return; }
+    if (target.closest('#demoTestMatros')) {
+      const teamId = $('demoTestTeam')?.value || teams()[0]?.id;
+      if (!teamId) { toast('Сначала адмирал должен создать команду.'); return; }
+      openGate(teamId, 'member');
+      return;
+    }
+    if (target.closest('#demoTestCaptain')) {
+      if (!teams().length) { toast('Сначала адмирал должен создать команду.'); return; }
+      openGate(null, 'captain');
+      return;
+    }
     if (target.closest('#finishTournament')) { finishTournament(); return; }
     const transferAdminButton = target.closest('[data-transfer-admin]');
     if (transferAdminButton) { transferAdmin(transferAdminButton.dataset.transferAdmin); return; }
@@ -1596,6 +1672,7 @@
   $('admiralFilter').addEventListener('change', (event) => { state.adminFilter = event.target.value; renderAdmiral(); save(); });
   $('admiralTourFilter')?.addEventListener('change', (event) => { state.adminTourId = event.target.value; renderAdmiral(); save(); });
   $('admiralTeamSelect')?.addEventListener('change', (event) => { state.adminTeamId = event.target.value; renderAdminRoster(); save(); });
+  $('demoTestTeam')?.addEventListener('change', () => { renderLiveAdminTools(); });
   $('tourCountInput')?.addEventListener('change', () => { renderTourSettingsFields(); });
 
   document.addEventListener('submit', (event) => {
